@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,600;1,6..72,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader", serif;
+  
+  --color-primary: #E94E77;
+  --color-on-primary: #ffffff;
+  
+  --color-secondary: #1A1A1A;
+  --color-on-secondary: #ffffff;
+  
+  --color-background: #F8F7F3;
+  --color-surface: #ffffff;
+  --color-surface-variant: #FFFFD1;
+  
+  --color-on-surface: #1A1A1A;
+  --color-on-surface-variant: #666666;
+  
+  --color-outline: #1A1A1A;
+  --color-outline-variant: #1A1A1A;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-on-surface font-sans;
+  }
+}
+
+@utility brutalist-shadow {
+  box-shadow: 8px 8px 0px var(--color-on-surface);
+}
+
+@utility brutalist-card {
+  @apply border-2 border-outline bg-surface brutalist-shadow transition-transform hover:translate-x-1 hover:-translate-y-1;
+}
+
+@utility text-label-caps {
+  @apply text-[10px] font-bold leading-none tracking-widest uppercase;
+}
+
+@utility font-artistic {
+  @apply font-serif italic;
+}
+

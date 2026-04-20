@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Primitive Helpers
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 4. Validation Blueprints
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email == request.auth.token.email &&
+             (data.get('department', '') is string && data.get('department', '').size() <= 100) &&
+             (data.get('biography', '') is string && data.get('biography', '').size() <= 500);
+    }
+
+    function isValidPost(data) {
+      return data.keys().hasAll(['authorId', 'title', 'content', 'createdAt', 'status', 'category']) &&
+             data.authorId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 5000 &&
+             data.createdAt == request.time &&
+             data.status in ['In Review', 'Resolved', 'Urgent', 'Discussion'] &&
+             data.category is string && data.category.size() <= 50 &&
+             (data.get('locationUrl', '') is string && data.get('locationUrl', '').size() <= 500) &&
+             (data.get('mediaUrl', '') is string && data.get('mediaUrl', '').size() <= 500);
+    }
+
+    function isValidComment(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'text', 'createdAt']) &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
+             data.createdAt == request.time;
+    }
+
+    // 5. Collection Rules
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); // We might need to list some basic info
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && 
+                      isValidUser(incoming()) && 
+                      incoming().uid == existing().uid &&
+                      incoming().email == existing().email &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'department', 'avatar', 'biography', 'impactPoints']);
+    }
+
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidPost(incoming()) && isValidId(postId);
+      allow delete: if isOwner(existing().authorId);
+      
+      allow update: if isSignedIn() && (
+        // Action: Author Edit
+        (isOwner(existing().authorId) && 
+         isValidPost(incoming()) && 
+         incoming().authorId == existing().authorId &&
+         incoming().createdAt == existing().createdAt &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'category', 'locationUrl', 'mediaUrl', 'mediaType'])) ||
+        
+        // Action: Vote
+        (incoming().diff(existing()).affectedKeys().hasOnly(['upvotes', 'downvotes', 'voters']) &&
+         incoming().authorId == existing().authorId &&
+         incoming().title == existing().title &&
+         incoming().voters.size() <= existing().voters.size() + 1 &&
+         // Ensure the user only modifies their own entry in the voters map
+         incoming().voters.keys().hasAll(existing().voters.keys()) &&
+         incoming().voters[request.auth.uid] in [1, -1])
+      );
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidComment(incoming()) && isValidId(commentId);
+        allow delete: if isOwner(existing().authorId);
+      }
+    }
+  }
+}

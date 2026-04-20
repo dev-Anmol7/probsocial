@@ -1,0 +1,6 @@
+{
+  "name": "CampusReport",
+  "description": "A digital campus infrastructure platform for reporting and tracking campus issues with an academic social feed.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": []
+}
